@@ -1,0 +1,204 @@
+TELECOM COMPLAINT COPILOT - SIMPLE EC2 LEARNING SETUP
+======================================================
+
+THE FLOW
+--------
+Files on EC2 -> Jenkins -> docker build -> Docker Hub
+
+There is NO Git/GitHub in this setup.
+
+
+1. COPY THE PROJECT TO EC2
+--------------------------
+From your Windows/Linux computer, copy the extracted folder to the EC2 server.
+Example:
+
+scp -i your-key.pem -r telecom-copilot-ec2-simple ubuntu@YOUR_EC2_IP:/home/ubuntu/
+
+SSH to EC2:
+
+ssh -i your-key.pem ubuntu@YOUR_EC2_IP
+
+Move it to the fixed folder Jenkins expects:
+
+sudo rm -rf /opt/telecom-copilot
+sudo mv /home/ubuntu/telecom-copilot-ec2-simple /opt/telecom-copilot
+sudo chown -R ubuntu:ubuntu /opt/telecom-copilot
+cd /opt/telecom-copilot
+
+
+2. INSTALL DOCKER + JENKINS
+---------------------------
+Run:
+
+chmod +x setup-ec2.sh
+./setup-ec2.sh
+
+Then LOG OUT and SSH back in so Docker group membership takes effect.
+
+Check:
+
+docker --version
+sudo systemctl status jenkins
+
+Jenkins is normally available on:
+
+http://YOUR_EC2_PUBLIC_IP:8080
+
+Your EC2 Security Group must allow TCP 8080 from YOUR IP for the learning lab.
+Your app will use TCP 3000. Allow 3000 from YOUR IP while testing.
+
+
+3. ADD YOUR DEEPSEEK KEY
+------------------------
+Edit the ONE environment file:
+
+nano /opt/telecom-copilot/.env
+
+Change:
+
+DEEPSEEK_API_KEY=PASTE_YOUR_DEEPSEEK_API_KEY_HERE
+
+Save: Ctrl+O, Enter
+Exit: Ctrl+X
+
+The .dockerignore excludes .env, so the key is NOT copied into the image.
+
+
+4. TEST THE APP WITHOUT JENKINS FIRST
+-------------------------------------
+Run:
+
+cd /opt/telecom-copilot
+./run-app-manually.sh
+
+Open:
+
+http://YOUR_EC2_PUBLIC_IP:3000
+
+Useful commands:
+
+docker ps
+docker logs -f telecom-copilot
+docker rm -f telecom-copilot
+
+
+5. CREATE A DOCKER HUB REPOSITORY
+---------------------------------
+Create a repository in Docker Hub, for example:
+
+YOUR_USERNAME/telecom-complaint-copilot
+
+Create a Docker Hub access token for Jenkins.
+
+
+6. GIVE JENKINS DOCKER HUB CREDENTIALS
+--------------------------------------
+In Jenkins:
+
+Manage Jenkins
+-> Credentials
+-> System
+-> Global credentials
+-> Add Credentials
+
+Kind: Username with password
+Username: your Docker Hub username
+Password: your Docker Hub access token
+ID: dockerhub-credentials
+
+The ID MUST be exactly:
+
+dockerhub-credentials
+
+
+7. EDIT THE JENKINS PIPELINE
+----------------------------
+Edit:
+
+nano /opt/telecom-copilot/Jenkinsfile
+
+Change:
+
+IMAGE_REPO = 'YOUR_DOCKERHUB_USERNAME/telecom-complaint-copilot'
+
+to your actual repository, for example:
+
+IMAGE_REPO = 'musty/telecom-complaint-copilot'
+
+Save the file.
+
+
+8. CREATE JENKINS JOB - NO GIT
+------------------------------
+Jenkins Dashboard
+-> New Item
+-> Enter: Telecom-Copilot-Build
+-> Select: Pipeline
+-> OK
+
+Scroll to Pipeline.
+Definition: Pipeline script
+
+Open this server file:
+
+cat /opt/telecom-copilot/jenkins-pipeline-to-paste.txt
+
+Copy ALL its contents and paste it into the Jenkins Pipeline script box.
+
+IMPORTANT:
+If you changed IMAGE_REPO in Jenkinsfile, also change the same IMAGE_REPO line
+in the text you paste into Jenkins, or run:
+
+cp /opt/telecom-copilot/Jenkinsfile /opt/telecom-copilot/jenkins-pipeline-to-paste.txt
+
+Save the Jenkins job.
+
+Click BUILD NOW.
+
+Jenkins will do only three things:
+
+1. Read /opt/telecom-copilot
+2. Build the Docker image
+3. Push these images to Docker Hub:
+
+YOUR_USERNAME/telecom-complaint-copilot:<JENKINS_BUILD_NUMBER>
+YOUR_USERNAME/telecom-complaint-copilot:latest
+
+
+9. RUN THE IMAGE FROM DOCKER HUB
+--------------------------------
+Edit:
+
+nano /opt/telecom-copilot/run-from-dockerhub.sh
+
+Change IMAGE_REPO to your repository.
+
+Then:
+
+chmod +x /opt/telecom-copilot/run-from-dockerhub.sh
+/opt/telecom-copilot/run-from-dockerhub.sh
+
+Open:
+
+http://YOUR_EC2_PUBLIC_IP:3000
+
+
+10. SIMPLE LEARNING ARCHITECTURE
+--------------------------------
+
+/opt/telecom-copilot
+        |
+        v
+     Jenkins
+        |
+        | docker build
+        v
+  Local Docker Image
+        |
+        | docker push
+        v
+     Docker Hub
+
+The .env file stays ONLY on EC2 and is supplied when the container runs.
+It is not included in the Docker image.
