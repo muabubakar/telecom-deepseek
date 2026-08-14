@@ -43,3 +43,8 @@ nano /opt/telecom-copilot/.env
 and put your DeepSeek key there.
 
 For the complete EC2/Jenkins sequence, open `SETUP-QUICK.txt`.
+
+AI connection:
+DEEPSEEK_BASE_URL=https://YOUR-PROVIDER-BASE-URL/v1
+DEEPSEEK_API_KEY=YOUR_KEY
+DEEPSEEK_MODEL=YOUR_PROVIDER_MODEL

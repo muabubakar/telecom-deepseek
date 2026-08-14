@@ -46,6 +46,9 @@ export async function POST(request: Request) {
     if (!process.env.DEEPSEEK_API_KEY) {
       return NextResponse.json({ error: "DEEPSEEK_API_KEY is not configured on the server." }, { status: 500 });
     }
+    if (!process.env.DEEPSEEK_BASE_URL) {
+      return NextResponse.json({ error: "DEEPSEEK_BASE_URL is not configured on the server." }, { status: 500 });
+    }
 
     const raw = await request.text();
     if (raw.length > MAX_INPUT_LENGTH) {
@@ -61,6 +64,10 @@ export async function POST(request: Request) {
     const regulatorName = process.env.REGULATOR_NAME || "Nigerian Communications Commission (NCC)";
     const regulatorEmail = process.env.REGULATOR_EMAIL || "consumerportal@ncc.gov.ng";
     const model = process.env.DEEPSEEK_MODEL || "deepseek-v4-flash";
+    const baseUrl = process.env.DEEPSEEK_BASE_URL.trim().replace(/\/+$/, "");
+    const chatUrl = baseUrl.endsWith("/chat/completions")
+      ? baseUrl
+      : `${baseUrl}/chat/completions`;
 
     const mustGoToOperatorFirst = form.contactedProvider === "no";
 
@@ -100,7 +107,7 @@ Return ONLY valid JSON with exactly this shape:
       complaintFacts: form,
     };
 
-    const response = await fetch("https://api.deepseek.com/chat/completions", {
+    const response = await fetch(chatUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -113,7 +120,6 @@ Return ONLY valid JSON with exactly this shape:
           { role: "user", content: JSON.stringify(aiPayload) },
         ],
         response_format: { type: "json_object" },
-        thinking: { type: "disabled" },
         stream: false,
         temperature: 0.2,
       }),
